@@ -41,11 +41,8 @@ CU_SRC += $(foreach d,$(SRC_DIR), $(wildcard $(d)/*.cu) )
 CPP_OBJ += $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(notdir $(CPP_SRC)))
 CU_OBJ += $(patsubst %.cu, $(OBJ_DIR)/%.o, $(notdir $(CU_SRC)))
 
-CPP_ASM += $(patsubst %.cpp, $(ASM_DIR)/%.S, $(notdir $(CPP_SRC)))
-CU_ASM += $(patsubst %.cu, $(ASM_DIR)/%.S, $(notdir $(CU_SRC)))
-
 OBJ = $(CPP_OBJ) $(CU_OBJ)
-ASM = $(CPP_ASM) $(CU_ASM)
+ASM = $(KERNEL_ASM)
 
 TEST_SRC = $(foreach d,$(TEST_DIR), $(wildcard $(d)/*.cpp) )
 TEST_OBJ = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(notdir $(TEST_SRC)))
@@ -75,14 +72,11 @@ $(CU_OBJ) : $(OBJ_DIR)/%.o : %.cu
 $(KERNEL_OBJ) : $(OBJ_DIR)/%.o : %.cu
 	$(CC) -c -o $@ $^ $(CFLAGS) $(INC)
 
-$(CPP_ASM) : $(ASM_DIR)/%.S : %.cpp
-	$(CC) -ptx -o $@ $^ $(CFLAGS) $(INC)
-
-$(CU_ASM) : $(ASM_DIR)/%.S : %.cu
-	$(CC) -ptx -o $@ $^ $(CFLAGS) $(INC)
-
 $(TEST_OBJ) : $(OBJ_DIR)/%.o : %.cpp
 	$(CC) -c -o $@ $^ $(CFLAGS) $(INC)
+
+$(KERNEL_ASM) : $(ASM_DIR)/%.S : %.cu
+	$(CC) -ptx -o $@ $^ $(CFLAGS) $(INC)
 
 clean:
 	rm -rf $(OBJ_DIR)/*.o
