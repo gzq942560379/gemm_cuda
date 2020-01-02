@@ -3,7 +3,7 @@ CC = nvcc
 CFLAGS += -w 
 CFLAGS += -std=c++11 
 CFLAGS += -O0
-CFLAGS += -gencode arch=compute_60,code=sm_60
+# CFLAGS += -gencode arch=compute_60,code=sm_60
 CFLAGS += -m64 
 CFLAGS += -ccbin g++
 CFLAGS += -g -G
@@ -19,13 +19,22 @@ INC_DIR = $(ROOT)/include
 BIN_DIR = $(ROOT)/bin
 ASM_DIR = $(ROOT)/asm
 OBJ_DIR = $(ROOT)/obj
+KERNEL_DIR = $(ROOT)/kernel
 
 SRC_DIR = $(shell find src -type d)
 TEST_DIR = $(ROOT)/test
 
 vpath %.cpp $(SRC_DIR)
-vpath %.cu $(SRC_DIR)
 vpath %.cpp $(TEST_DIR)
+vpath %.cu $(SRC_DIR)
+vpath %.cu $(KERNEL_DIR)
+
+
+KERNEL_SRC = $(wildcard $(KERNEL_DIR)/*.cu)
+KERNEL_OBJ = $(patsubst %.cu, $(OBJ_DIR)/%.o, $(notdir $(KERNEL_SRC)))
+KERNEL_ASM = $(patsubst %.cu, $(ASM_DIR)/%.S, $(notdir $(KERNEL_SRC)))
+
+$(info $(KERNEL_OBJ))
 
 CPP_SRC += $(foreach d,$(SRC_DIR), $(wildcard $(d)/*.cpp) )
 CU_SRC += $(foreach d,$(SRC_DIR), $(wildcard $(d)/*.cu) )
@@ -40,7 +49,9 @@ ASM = $(CPP_ASM) $(CU_ASM)
 
 TEST_SRC = $(foreach d,$(TEST_DIR), $(wildcard $(d)/*.cpp) )
 TEST_OBJ = $(patsubst %.cpp, $(OBJ_DIR)/%.o, $(notdir $(TEST_SRC)))
-BIN = $(patsubst $(TEST_DIR)/%.cpp, $(BIN_DIR)/%, $(TEST_SRC) )
+
+
+BIN = $(patsubst %.cu, $(BIN_DIR)/%, $(notdir $(KERNEL_SRC)) )
 
 $(info $(BIN))
 
@@ -52,13 +63,16 @@ bin : $(BIN) asm
 
 asm : $(ASM) 
 
-$(BIN) : $(BIN_DIR)/% : $(OBJ_DIR)/%.o $(OBJ)
+$(BIN) : $(BIN_DIR)/% : $(OBJ_DIR)/matMul.o $(OBJ_DIR)/%.o $(OBJ) 
 	$(CC) -o $@ $^ $(CFLAGS) $(LIB)
 
 $(CPP_OBJ) : $(OBJ_DIR)/%.o : %.cpp
 	$(CC) -c -o $@ $^ $(CFLAGS) $(INC)
 
 $(CU_OBJ) : $(OBJ_DIR)/%.o : %.cu
+	$(CC) -c -o $@ $^ $(CFLAGS) $(INC)
+
+$(KERNEL_OBJ) : $(OBJ_DIR)/%.o : %.cu
 	$(CC) -c -o $@ $^ $(CFLAGS) $(INC)
 
 $(CPP_ASM) : $(ASM_DIR)/%.S : %.cpp
