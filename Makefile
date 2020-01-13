@@ -3,7 +3,7 @@ CC = nvcc
 CFLAGS += -w 
 CFLAGS += -std=c++11 
 CFLAGS += -O2
-CFLAGS += -gencode arch=compute_60,code=sm_60
+# CFLAGS += -gencode arch=compute_60,code=sm_60
 CFLAGS += -m64 
 CFLAGS += -ccbin g++
 # CFLAGS += --ptxas-options=-v
@@ -30,7 +30,6 @@ vpath %.cpp $(SRC_DIR)
 vpath %.cpp $(TEST_DIR)
 vpath %.cu $(SRC_DIR)
 vpath %.cu $(KERNEL_DIR)
-
 
 KERNEL_SRC = $(wildcard $(KERNEL_DIR)/*.cu)
 KERNEL_OBJ = $(patsubst %.cu, $(OBJ_DIR)/%.o, $(notdir $(KERNEL_SRC)))

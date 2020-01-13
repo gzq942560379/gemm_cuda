@@ -36,8 +36,8 @@ __global__ void mat_mul_nn_kernel(const Matrix A, const Matrix B, Matrix C, cons
 
 blas_status sgemm_nn(int m, int n, int k, const float *alpha, const float *A, int lda, const float *B, int ldb, const float *beta, float *C, int ldc)
 {
-	const Matrix a(m, k, lda, A);
-	const Matrix b(k, n, ldb, B);
+	const Matrix a(m, k, lda, const_cast<float*>(A));
+	const Matrix b(k, n, ldb, const_cast<float*>(B));
 	Matrix c(m, n, ldc, C);
 	const int Mtile = 16;
 	const int Ntile = 16;

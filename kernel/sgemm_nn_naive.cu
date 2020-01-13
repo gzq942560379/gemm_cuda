@@ -25,8 +25,8 @@ blas_status sgemm_nn(int m, int n, int k, const float *alpha, const float *A, in
 	const int Ntile = 16;
 	const int Ktile = 16;
 
-	const Matrix a(m, k, lda, A);
-	const Matrix b(k, n, ldb, B);
+	const Matrix a(m, k, lda, const_cast<float*>(A));
+	const Matrix b(k, n, ldb, const_cast<float*>(B));
 	Matrix c(m, n, ldc, C);
 
 	dim3 dimBlock(Mtile, Ntile);

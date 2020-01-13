@@ -49,37 +49,57 @@ __global__ void mat_mul_nn_kernel(const Matrix A, const Matrix B, Matrix C, cons
 	const int Asize = Mtile * Ktile;
 	const int Bsize = Ktile * Ntile;
 
-	__shared__ float As[Asize];
-	__shared__ float Bs[Bsize];
+	__shared__ float As[2][Asize];
+	__shared__ float Bs[2][Bsize];
 
 	float Afragment[thread_m];
 	float Bfragment[thread_n];
 
+	int kb_pre = 0;
+	int cur;
+	int next = kb_pre & 1;
+	Matrix Ablock_pre,Bblock_pre;
+	if(kb_pre < (A.cols / Ktile)){
+		Ablock_pre = A.getSubMatrix(blockRow, kb_pre, Mtile, Ktile);
+		Bblock_pre = B.getSubMatrix(kb_pre, blockCol, Ktile, Ntile);
+		for (int fid = blockThreadId; fid < Asize; fid += blockThreadNum)
+			As[next][fid] = Ablock_pre.getValue(fid % lda, fid / lda);
+		for (int fid = blockThreadId; fid < Bsize; fid += blockThreadNum)
+			Bs[next][fid] = Bblock_pre.getValue(fid % ldb, fid / ldb);
+	}
+
 	for (int kb = 0; kb < (A.cols / Ktile); ++kb)
 	{
-		const Matrix Ablock = A.getSubMatrix(blockRow, kb, Mtile, Ktile);
-		const Matrix Bblock = B.getSubMatrix(kb, blockCol, Ktile, Ntile);
-		for (int fid = blockThreadId; fid < Asize; fid += blockThreadNum)
-			As[fid] = Ablock.getValue(fid % lda, fid / lda);
-		for (int fid = blockThreadId; fid < Bsize; fid += blockThreadNum)
-			Bs[fid] = Bblock.getValue(fid % ldb, fid / ldb);
+		__syncthreads();
+		const Matrix Ablock = Ablock_pre;
+		const Matrix Bblock = Bblock_pre;
+		kb_pre = kb + 1;
+		cur = kb & 1;
+		next = kb_pre & 1;
+		if(kb_pre < (A.cols / Ktile)){
+			Ablock_pre = A.getSubMatrix(blockRow, kb_pre, Mtile, Ktile);
+			Bblock_pre = B.getSubMatrix(kb_pre, blockCol, Ktile, Ntile);
+			for (int fid = blockThreadId; fid < Asize; fid += blockThreadNum)
+				As[next][fid] = Ablock_pre.getValue(fid % lda, fid / lda);
+			for (int fid = blockThreadId; fid < Bsize; fid += blockThreadNum)
+				Bs[next][fid] = Bblock_pre.getValue(fid % ldb, fid / ldb);
+		}
 		const Matrix Awarp = Ablock.getSubMatrix(warpRowId, 0, warp_m, Ktile);
 		const Matrix Bwarp = Bblock.getSubMatrix(0, warpColId, Ktile, Warp_n);
 		const Matrix Athread = Awarp.getSubMatrix(warpThreadRowId, 0, thread_m, Ktile);
 		const Matrix Bthread = Bwarp.getSubMatrix(0, warpThreadColId, Ktile, thread_n);
-		__syncthreads();
 		for (int k = 0; k < Ktile; ++k)
 		{
 			for (int tr = 0; tr < thread_m; tr++)
-				Afragment[tr] = As[index2(k, tr, lda)];
+				Afragment[tr] = As[cur][index2(k, tr, lda)];
 			for (int tc = 0; tc < thread_n; tc++)
-				Bfragment[tc] = Bs[index2(tc, k, ldb)];
+				Bfragment[tc] = Bs[cur][index2(tc, k, ldb)];
 			for (int tc = 0; tc < thread_n; tc++)
 				for (int tr = 0; tr < thread_m; tr++)
 					Cvalue[index2(tc, tr, ldc)] += Afragment[tr] * Bfragment[tc];
 		}
-		__syncthreads();
 	}
+	__syncthreads();
 	for (int tc = 0; tc < thread_n; tc++)
 	{
 		for (int tr = 0; tr < thread_m; tr++)
@@ -96,7 +116,7 @@ blas_status sgemm_nn(int m, int n, int k, const float *alpha, const float *A, in
 	Matrix c(m, n, ldc, C);
 	const int Mtile = 64;
 	const int Ntile = 64;
-	const int Ktile = 16;
+	const int Ktile = 8;
 	int thread_num = 256;
 	mat_mul_nn_kernel<Mtile, Ntile, Ktile><<<dim3(m / Mtile, n / Ntile), dim3(thread_num)>>>(a, b, c, *alpha, *beta);
 }
